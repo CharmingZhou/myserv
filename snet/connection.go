@@ -16,18 +16,20 @@ type Connection struct {
 
 	handleAPI siface.HandFunc //该连接的处理方法api
 
-	Router siface.Router //该连接的处理方法router
+	//Router siface.Router //该连接的处理方法router
+
+	MsgHandler siface.MsgHandler //消息管理 MsgId和对应处理方法的消息管理模块
 
 	ExitBuffChan chan bool //告知该连接已经退出/停止的channel
 }
 
 // 创建连接的方法
-func NewConnection(conn *net.TCPConn, connID uint32, router siface.Router) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, msgHandler siface.MsgHandler) *Connection {
 	c := &Connection{
 		Conn:         conn,
 		ConnID:       connID,
 		isClosed:     false,
-		Router:       router,
+		MsgHandler:   msgHandler,
 		ExitBuffChan: make(chan bool, 1),
 	}
 	return c
@@ -76,13 +78,15 @@ func (c *Connection) StartReader() {
 			conn: c,
 			msg:  msg,
 		}
-		//从路由Routers中找到注册绑定 Conn的对应Handle
-		go func(request siface.Request) {
-			//执行注册的路由方法
-			c.Router.PreHandle(request)
-			c.Router.Handle(request)
-			c.Router.PostHandle(request)
-		}(&req)
+		go c.MsgHandler.DoMsgHandler(&req)
+		/*
+			//从路由Routers中找到注册绑定 Conn的对应Handle
+			go func(request siface.Request) {
+				//执行注册的路由方法
+				c.Router.PreHandle(request)
+				c.Router.Handle(request)
+				c.Router.PostHandle(request)
+			}(&req)*/
 
 	}
 }

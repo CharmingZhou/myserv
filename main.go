@@ -14,33 +14,29 @@ type PingRouter struct {
 	snet.BaseRouter
 }
 
-func (this *PingRouter) PreHandle(request siface.Request) {
-	fmt.Println("Call Router PreHandle")
-	/*
-		_, err := request.GetConnection().GetTCPConnection().Write([]byte("before ping...\n"))
-		if err != nil {
-			fmt.Println(fmt.Println("call back ping error"))
-		}*/
-}
-
 func (this *PingRouter) Handle(request siface.Request) {
 	fmt.Println("Call PingRouter Hanle")
 	//先读取客户端的数据，再写回ping...ping....ping
 	fmt.Println("recv from client: msgid=", request.GetMsgId(), ", data=", string(request.GetData()))
 	//写回数据
-	err := request.GetConnection().SendMsg(1, []byte("ping...ping...ping"))
+	err := request.GetConnection().SendMsg(0, []byte("ping...ping...ping"))
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func (this *PingRouter) PostHandle(request siface.Request) {
-	fmt.Println("Call Router Posthandle")
-	/*
-		err := request.GetConnection().SendMsg(2, []byte("After ping...\n"))
-		if err != nil {
-			fmt.Println("call back ping ping ping error")
-		}*/
+type HelloMyServRouter struct {
+	snet.BaseRouter
+}
+
+func (this *HelloMyServRouter) Handle(request siface.Request) {
+	fmt.Println("Call HelloMyServRouter Handle")
+	fmt.Println("recv from client: msgId=", request.GetMsgId(), ",data=", string(request.GetData()))
+
+	err := request.GetConnection().SendMsg(1, []byte("Hello MyServ Router V0.6"))
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func clientTest() {
@@ -53,10 +49,13 @@ func clientTest() {
 		fmt.Println("client start err, exit!")
 		return
 	}
+	i := 0
 	for {
+		i++
 		//发封包message消息
 		dp := snet.NewDataPack()
-		msg, _ := dp.Pack(snet.NewMsgPackage(0, []byte("MyServ V0.5 Client Test Message")))
+		msgId := uint32(i % 2)
+		msg, _ := dp.Pack(snet.NewMsgPackage(msgId, []byte("MyServ V0.5 Client Test Message")))
 		_, err := conn.Write(msg)
 		if err != nil {
 			fmt.Println("write error err ", err)
@@ -96,8 +95,12 @@ func clientTest() {
 }
 
 func main() {
-	s := snet.NewServer("[myserv V0.3]")
-	s.AddRouter(&PingRouter{})
+	s := snet.NewServer("[MyServ V0.6]")
+
+	//配置路由
+	s.AddRouter(0, &PingRouter{})
+	s.AddRouter(1, &HelloMyServRouter{})
+
 	go func() {
 		clientTest()
 	}()

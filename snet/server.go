@@ -12,11 +12,12 @@ import (
 )
 
 type Server struct {
-	Name      string        //服务器的名称
-	IPVersion string        //tcp4 or other
-	IP        string        //服务绑定的IP地址
-	Port      int           //服务绑定的端口
-	Router    siface.Router //当前Server由用户绑定的回调router，也就是Server注册的链接对应的处理业务
+	Name      string //服务器的名称
+	IPVersion string //tcp4 or other
+	IP        string //服务绑定的IP地址
+	Port      int    //服务绑定的端口
+	//Router    siface.Router //当前Server由用户绑定的回调router，也就是Server注册的链接对应的处理业务
+	msgHandler siface.MsgHandler //当前Server的消息管理模块，用来绑定MsgId和对应的处理方法
 }
 
 func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
@@ -70,7 +71,7 @@ func (s *Server) Start() {
 			//3.2 TODO: Server.Start()设置服务器最大连接控制，如果超过最大连接，那么则关闭此新的连接
 
 			//3.3 处理该新连接请求的业务方法，此时应该有handler和conn的绑定的
-			dealConn := NewConnection(conn, cid, s.Router)
+			dealConn := NewConnection(conn, cid, s.msgHandler)
 			cid++
 
 			//3.4 启动当前连接的处理业务
@@ -94,10 +95,8 @@ func (s *Server) Serve() {
 		time.Sleep(10 * time.Second)
 	}
 }
-
-// 路由功能：给当前服务注册一个路由业务方法，供客户端连接处理使用
-func (s *Server) AddRouter(router siface.Router) {
-	s.Router = router
+func (s *Server) AddRouter(msgId uint32, router siface.Router) {
+	s.msgHandler.AddRouter(msgId, router)
 	fmt.Println("Add Router succ! ")
 }
 
@@ -111,7 +110,8 @@ func NewServer(name string) siface.Server {
 		IPVersion: "tcp4",
 		IP:        utils.GlobalObject.Host,
 		Port:      utils.GlobalObject.TcpPort,
-		Router:    nil,
+		//Router:    nil,
+		msgHandler: NewMsgHandle(),
 	}
 	return s
 }
