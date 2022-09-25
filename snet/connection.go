@@ -14,16 +14,18 @@ type Connection struct {
 
 	handleAPI siface.HandFunc //该连接的处理方法api
 
+	Router siface.Router //该连接的处理方法router
+
 	ExitBuffChan chan bool //告知该连接已经退出/停止的channel
 }
 
 // 创建连接的方法
-func NewConnection(conn *net.TCPConn, connID uint32, callbackApi siface.HandFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router siface.Router) *Connection {
 	c := &Connection{
 		Conn:         conn,
 		ConnID:       connID,
 		isClosed:     false,
-		handleAPI:    callbackApi,
+		Router:       router,
 		ExitBuffChan: make(chan bool, 1),
 	}
 	return c
@@ -38,18 +40,25 @@ func (c *Connection) StartReader() {
 	for {
 		//读取我们最大的数据到buf中
 		buf := make([]byte, 512)
-		cnt, err := c.Conn.Read(buf)
+		_, err := c.Conn.Read(buf)
 		if err != nil {
 			fmt.Println("recv buf err", err)
 			c.ExitBuffChan <- true
 			continue
 		}
-		//调用当前连接业务（这里执行的是当前conn的绑定的handle方法）
-		if err := c.handleAPI(c.Conn, buf, cnt); err != nil {
-			fmt.Println("connId ", c.ConnID, "handle is error")
-			c.ExitBuffChan <- true
-			return
+		//得到当前客户端请求的Request数据
+		req := Request{
+			conn: c,
+			data: buf,
 		}
+		//从路由Routers中找到注册绑定 Conn的对应Handle
+		go func(request siface.Request) {
+			//执行注册的路由方法
+			c.Router.PreHandle(request)
+			c.Router.Handle(request)
+			c.Router.PostHandle(request)
+		}(&req)
+
 	}
 }
 

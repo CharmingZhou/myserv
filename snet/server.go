@@ -10,10 +10,11 @@ import (
 )
 
 type Server struct {
-	Name      string
-	IPVersion string
-	IP        string
-	Port      int
+	Name      string        //服务器的名称
+	IPVersion string        //tcp4 or other
+	IP        string        //服务绑定的IP地址
+	Port      int           //服务绑定的端口
+	Router    siface.Router //当前Server由用户绑定的回调router，也就是Server注册的链接对应的处理业务
 }
 
 func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
@@ -63,7 +64,7 @@ func (s *Server) Start() {
 			//3.2 TODO: Server.Start()设置服务器最大连接控制，如果超过最大连接，那么则关闭此新的连接
 
 			//3.3 处理该新连接请求的业务方法，此时应该有handler和conn的绑定的
-			dealConn := NewConnection(conn, cid, CallBackToClient)
+			dealConn := NewConnection(conn, cid, s.Router)
 			cid++
 
 			//3.4 启动当前连接的处理业务
@@ -88,6 +89,12 @@ func (s *Server) Serve() {
 	}
 }
 
+// 路由功能：给当前服务注册一个路由业务方法，供客户端连接处理使用
+func (s *Server) AddRouter(router siface.Router) {
+	s.Router = router
+	fmt.Println("Add Router succ! ")
+}
+
 // 创建一个服务器句柄
 func NewServer(name string) siface.Server {
 	s := &Server{
@@ -95,6 +102,7 @@ func NewServer(name string) siface.Server {
 		IPVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      7777,
+		Router:    nil,
 	}
 	return s
 }
