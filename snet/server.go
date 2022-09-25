@@ -6,6 +6,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/CharmingZhou/myserv/utils"
+
 	"github.com/CharmingZhou/myserv/siface"
 )
 
@@ -31,6 +33,10 @@ func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
 // 开启网络服务
 func (s *Server) Start() {
 	fmt.Printf("[START] Server listener at IP:%s, Port:%d, is starting\n", s.IP, s.Port)
+	fmt.Printf("[MyServ] Version:%s, MaxConn:%d, MaxpacketSize:%d\n",
+		utils.GlobalObject.Version,
+		utils.GlobalObject.MaxConn,
+		utils.GlobalObject.MaxPacketSize)
 	//开启一个go去做服务端Listener业务
 	go func() {
 		//1 获取一个TCP的Addr
@@ -97,11 +103,14 @@ func (s *Server) AddRouter(router siface.Router) {
 
 // 创建一个服务器句柄
 func NewServer(name string) siface.Server {
+	//先初始化全局配置文件
+	utils.GlobalObject.Reload()
+
 	s := &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      7777,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
 		Router:    nil,
 	}
 	return s
