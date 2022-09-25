@@ -4,4 +4,5 @@ package siface
 type Request interface {
 	GetConnection() Connection //获取请求连接信息
 	GetData() []byte           //获取请求消息的数据
+	GetMsgId() uint32
 }
