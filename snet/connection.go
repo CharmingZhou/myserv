@@ -21,6 +21,8 @@ type Connection struct {
 	MsgHandler siface.MsgHandler //消息管理 MsgId和对应处理方法的消息管理模块
 
 	ExitBuffChan chan bool //告知该连接已经退出/停止的channel
+	//无缓冲管道，用于读、写两个goroutine之间的消息通信
+	msgChan chan []byte
 }
 
 // 创建连接的方法
@@ -31,6 +33,7 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler siface.MsgHandle
 		isClosed:     false,
 		MsgHandler:   msgHandler,
 		ExitBuffChan: make(chan bool, 1),
+		msgChan:      make(chan []byte), //msgChan初始化
 	}
 	return c
 }
@@ -91,8 +94,31 @@ func (c *Connection) StartReader() {
 	}
 }
 
+// 写消息Goroutine，用户将数据发送给客户端
+func (c *Connection) StartWriter() {
+	fmt.Println("[Writer Goroutine is running]")
+	defer fmt.Println(c.RemoteAddr().String(), "[conn Writer exit!]")
+
+	for {
+		select {
+		case data := <-c.msgChan:
+			//有数据要写给客户端
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("Send Data error:, ", err, " Conn Writer exit")
+				return
+			}
+		case <-c.ExitBuffChan:
+			//conn已经关闭
+			return
+		}
+	}
+}
+
 func (c *Connection) Start() {
-	go c.StartReader() //开启处理该连接读取到客户端数据之后的请求业务
+	//1.开启处理该连接读取到客户端数据之后的请求业务
+	go c.StartReader()
+	//2 开启用于写回客户端数据流程的Goroutine
+	go c.StartWriter()
 
 	for {
 		select {
@@ -139,12 +165,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 		fmt.Println("Pack err msg id =", msgId)
 		return errors.New("Pack error msg ")
 	}
+	c.msgChan <- msg //将之前直接回写给conn.Write的方法改为发送给Channel供Writer读写
 
-	//写回客户端
-	if _, err := c.Conn.Write(msg); err != nil {
-		fmt.Println("Write msg id", msgId, " error")
-		c.ExitBuffChan <- true
-		return errors.New("conn Write error")
-	}
 	return nil
 }
