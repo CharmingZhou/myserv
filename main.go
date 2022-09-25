@@ -33,7 +33,7 @@ func (this *HelloMyServRouter) Handle(request siface.Request) {
 	fmt.Println("Call HelloMyServRouter Handle")
 	fmt.Println("recv from client: msgId=", request.GetMsgId(), ",data=", string(request.GetData()))
 
-	err := request.GetConnection().SendMsg(1, []byte("Hello MyServ Router V0.6"))
+	err := request.GetConnection().SendMsg(1, []byte("Hello MyServ Router V0.8"))
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -90,12 +90,13 @@ func clientTest() {
 			}
 			fmt.Println("===> Recv Msg: ID=", msg.Id, ", len=", msg.DataLen, ",data=", string(msg.Data))
 		}
+		time.Sleep(1 * time.Second)
 	}
 	time.Sleep(1 * time.Second)
 }
 
 func main() {
-	s := snet.NewServer("[MyServ V0.6]")
+	s := snet.NewServer("[MyServ V0.8]")
 
 	//配置路由
 	s.AddRouter(0, &PingRouter{})

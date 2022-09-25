@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 
+	"github.com/CharmingZhou/myserv/utils"
+
 	"github.com/CharmingZhou/myserv/siface"
 )
 
@@ -81,15 +83,13 @@ func (c *Connection) StartReader() {
 			conn: c,
 			msg:  msg,
 		}
-		go c.MsgHandler.DoMsgHandler(&req)
-		/*
-			//从路由Routers中找到注册绑定 Conn的对应Handle
-			go func(request siface.Request) {
-				//执行注册的路由方法
-				c.Router.PreHandle(request)
-				c.Router.Handle(request)
-				c.Router.PostHandle(request)
-			}(&req)*/
+		if utils.GlobalObject.WorkPoolSize > 0 {
+			//已经启动工作池机制，将消息交给Worker处理
+			c.MsgHandler.SendMsgToTaskQueue(&req)
+		} else {
+			//从绑定好的消息和对应的处理方法中执行对应的Handle方法
+			go c.MsgHandler.DoMsgHandler(&req)
+		}
 
 	}
 }
