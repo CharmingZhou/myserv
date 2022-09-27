@@ -19,6 +19,9 @@ type Server struct {
 	//Router    siface.Router //当前Server由用户绑定的回调router，也就是Server注册的链接对应的处理业务
 	msgHandler siface.MsgHandler //当前Server的消息管理模块，用来绑定MsgId和对应的处理方法
 	ConnMgr    siface.ConnManager
+
+	OnConnStart func(conn siface.Connection)
+	OnConnStop  func(conn siface.Connection)
 }
 
 func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
@@ -127,4 +130,26 @@ func NewServer(name string) siface.Server {
 }
 func (s *Server) GetConnMgr() siface.ConnManager {
 	return s.ConnMgr
+}
+
+func (s *Server) SetOnConnStart(hookFunc func(connection siface.Connection)) {
+	s.OnConnStart = hookFunc
+}
+
+func (s *Server) SetOnConnStop(hookFunc func(connection siface.Connection)) {
+	s.OnConnStop = hookFunc
+}
+
+func (s *Server) CallOnConnStart(conn siface.Connection) {
+	if s.OnConnStart != nil {
+		fmt.Println("--->CallOnConnStart...")
+		s.OnConnStart(conn)
+	}
+}
+
+func (s *Server) CallOnConnStop(conn siface.Connection) {
+	if s.OnConnStop != nil {
+		fmt.Println("----> CallOnConnStop....")
+		s.OnConnStop(conn)
+	}
 }

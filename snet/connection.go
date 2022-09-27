@@ -28,7 +28,7 @@ type Connection struct {
 	//无缓冲管道，用于读、写两个goroutine之间的消息通信
 	msgChan chan []byte
 	//有缓冲管道，用于读、写两个goroutine之间的消息通信
-	msgBuffChan chan []byte
+	msgBuffChan chan []byte //定义channel成员
 }
 
 // 创建连接的方法
@@ -41,7 +41,7 @@ func NewConnection(server siface.Server, conn *net.TCPConn, connID uint32, msgHa
 		MsgHandler:   msgHandler,
 		ExitBuffChan: make(chan bool, 1),
 		msgChan:      make(chan []byte), //msgChan初始化
-		msgBuffChan:  make(chan []byte, utils.GlobalObject.MaxWorkerTaskLen),
+		msgBuffChan:  make(chan []byte, utils.GlobalObject.MaxMsgChanLen),
 	}
 	//将新创建的Conn添加到连接管理中
 	c.TcpServer.GetConnMgr().Add(c) //将当前新创建的连接添加到ConnManager中
@@ -102,6 +102,24 @@ func (c *Connection) StartReader() {
 	}
 }
 
+func (c *Connection) SendBuffMsg(msgId uint32, data []byte) error {
+	if c.isClosed == true {
+		return errors.New("Connection closed when send buf msg")
+	}
+	//将data封包，并且发送
+	dp := NewDataPack()
+	msg, err := dp.Pack(NewMsgPackage(msgId, data))
+	if err != nil {
+		fmt.Println("Pack error msg id = ", msgId)
+		return errors.New("Pack error msg ")
+	}
+
+	//写回客户端
+	c.msgBuffChan <- msg
+
+	return nil
+}
+
 // 写消息Goroutine，用户将数据发送给客户端
 func (c *Connection) StartWriter() {
 	fmt.Println("[Writer Goroutine is running]")
@@ -114,6 +132,17 @@ func (c *Connection) StartWriter() {
 			if _, err := c.Conn.Write(data); err != nil {
 				fmt.Println("Send Data error:, ", err, " Conn Writer exit")
 				return
+			}
+
+		case data, ok := <-c.msgBuffChan:
+			if ok {
+				if _, err := c.Conn.Write(data); err != nil {
+					fmt.Println("Send Buff Data error:, ", err, "Conn Writer exist")
+					return
+				} else {
+					break
+					fmt.Println("msgBuffChan if Closed")
+				}
 			}
 		case <-c.ExitBuffChan:
 			//conn已经关闭
@@ -128,12 +157,15 @@ func (c *Connection) Start() {
 	//2 开启用于写回客户端数据流程的Goroutine
 	go c.StartWriter()
 
-	for {
-		select {
-		case <-c.ExitBuffChan:
-			return //得到退出消息，不再阻塞
-		}
-	}
+	c.TcpServer.CallOnConnStart(c)
+
+	/*
+		for {
+			select {
+			case <-c.ExitBuffChan:
+				return //得到退出消息，不再阻塞
+			}
+		}*/
 }
 
 // 停止连接，结束当前连接状态M
@@ -144,6 +176,8 @@ func (c *Connection) Stop() {
 		return
 	}
 	c.isClosed = true
+
+	c.TcpServer.CallOnConnStop(c)
 
 	c.Conn.Close()         //关闭socket连接
 	c.ExitBuffChan <- true //通知缓冲队列数据的业务，该连接已经关闭

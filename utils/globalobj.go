@@ -19,6 +19,7 @@ type GlobalObj struct {
 	WorkPoolSize     uint32 //业务工作Worker池的数量
 	MaxWorkerTaskLen uint32 //业务工作Worker对应责任的任务队列最大任务存储数量
 	ConfFilePath     string
+	MaxMsgChanLen    uint32
 }
 
 var GlobalObject *GlobalObj

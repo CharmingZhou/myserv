@@ -39,6 +39,18 @@ func (this *HelloMyServRouter) Handle(request siface.Request) {
 	}
 }
 
+func DoConnectionBegin(conn siface.Connection) {
+	fmt.Println("DoConnection is Called...")
+	err := conn.SendMsg(2, []byte("DoConnection BEGIN..."))
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func DoConnectionLost(conn siface.Connection) {
+	fmt.Println("DoConnectionLost is Called...")
+}
+
 func clientTest() {
 	fmt.Println("Client Test...start")
 	//3秒之后发起测试请求，给服务端开启服务的机会
@@ -96,7 +108,11 @@ func clientTest() {
 }
 
 func main() {
-	s := snet.NewServer("[MyServ V0.8]")
+	s := snet.NewServer("[MyServ V0.9]")
+
+	//注册连接hook回调函数
+	s.SetOnConnStart(DoConnectionBegin)
+	s.SetOnConnStop(DoConnectionLost)
 
 	//配置路由
 	s.AddRouter(0, &PingRouter{})
