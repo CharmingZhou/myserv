@@ -18,6 +18,7 @@ type Server struct {
 	Port      int    //服务绑定的端口
 	//Router    siface.Router //当前Server由用户绑定的回调router，也就是Server注册的链接对应的处理业务
 	msgHandler siface.MsgHandler //当前Server的消息管理模块，用来绑定MsgId和对应的处理方法
+	ConnMgr    siface.ConnManager
 }
 
 func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
@@ -72,9 +73,13 @@ func (s *Server) Start() {
 			}
 
 			//3.2 TODO: Server.Start()设置服务器最大连接控制，如果超过最大连接，那么则关闭此新的连接
+			if s.ConnMgr.Len() >= utils.GlobalObject.MaxConn {
+				conn.Close()
+				continue
+			}
 
 			//3.3 处理该新连接请求的业务方法，此时应该有handler和conn的绑定的
-			dealConn := NewConnection(conn, cid, s.msgHandler)
+			dealConn := NewConnection(s, conn, cid, s.msgHandler)
 			cid++
 
 			//3.4 启动当前连接的处理业务
@@ -87,6 +92,7 @@ func (s *Server) Start() {
 func (s *Server) Stop() {
 	fmt.Println("[STOP] mysvr server ,name ", s.Name)
 	//TODO Server.Stop()将其他需要清理的连接信息或者其他信息，也要一并停止或者清理
+	s.ConnMgr.ClearConn()
 }
 
 func (s *Server) Serve() {
@@ -115,6 +121,10 @@ func NewServer(name string) siface.Server {
 		Port:      utils.GlobalObject.TcpPort,
 		//Router:    nil,
 		msgHandler: NewMsgHandle(),
+		ConnMgr:    NewConnManager(), //创建ConnManager
 	}
 	return s
+}
+func (s *Server) GetConnMgr() siface.ConnManager {
+	return s.ConnMgr
 }

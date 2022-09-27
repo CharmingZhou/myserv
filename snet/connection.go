@@ -12,9 +12,11 @@ import (
 )
 
 type Connection struct {
-	Conn     *net.TCPConn //当前连接的socket TCP套接字
-	ConnID   uint32       //当前连接的ID 也可以作为SessionID，ID全局唯一
-	isClosed bool         //当前连接的关闭状态
+	//当前Conn属于哪个Server
+	TcpServer siface.Server //当前conn属于哪个server，在conn初始化的时候添加即可
+	Conn      *net.TCPConn  //当前连接的socket TCP套接字
+	ConnID    uint32        //当前连接的ID 也可以作为SessionID，ID全局唯一
+	isClosed  bool          //当前连接的关闭状态
 
 	handleAPI siface.HandFunc //该连接的处理方法api
 
@@ -25,18 +27,24 @@ type Connection struct {
 	ExitBuffChan chan bool //告知该连接已经退出/停止的channel
 	//无缓冲管道，用于读、写两个goroutine之间的消息通信
 	msgChan chan []byte
+	//有缓冲管道，用于读、写两个goroutine之间的消息通信
+	msgBuffChan chan []byte
 }
 
 // 创建连接的方法
-func NewConnection(conn *net.TCPConn, connID uint32, msgHandler siface.MsgHandler) *Connection {
+func NewConnection(server siface.Server, conn *net.TCPConn, connID uint32, msgHandler siface.MsgHandler) *Connection {
 	c := &Connection{
+		TcpServer:    server, //将隶属的server传递进来
 		Conn:         conn,
 		ConnID:       connID,
 		isClosed:     false,
 		MsgHandler:   msgHandler,
 		ExitBuffChan: make(chan bool, 1),
 		msgChan:      make(chan []byte), //msgChan初始化
+		msgBuffChan:  make(chan []byte, utils.GlobalObject.MaxWorkerTaskLen),
 	}
+	//将新创建的Conn添加到连接管理中
+	c.TcpServer.GetConnMgr().Add(c) //将当前新创建的连接添加到ConnManager中
 	return c
 }
 
@@ -130,6 +138,8 @@ func (c *Connection) Start() {
 
 // 停止连接，结束当前连接状态M
 func (c *Connection) Stop() {
+	fmt.Println("Conn Stop() ... ConnID= ", c.ConnID)
+	//如果当前连接已经关闭
 	if c.isClosed == true { //1.如果当前连接已关闭
 		return
 	}
@@ -138,7 +148,11 @@ func (c *Connection) Stop() {
 	c.Conn.Close()         //关闭socket连接
 	c.ExitBuffChan <- true //通知缓冲队列数据的业务，该连接已经关闭
 
+	//将连接从连接管理器中删除
+	c.TcpServer.GetConnMgr().Remove(c) //删除conn从ConnManager中
+
 	close(c.ExitBuffChan) //关闭该连接全部管道
+	close(c.msgBuffChan)
 }
 
 func (c *Connection) GetTCPConnection() *net.TCPConn {
