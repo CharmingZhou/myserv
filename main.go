@@ -41,6 +41,12 @@ func (this *HelloMyServRouter) Handle(request siface.Request) {
 
 func DoConnectionBegin(conn siface.Connection) {
 	fmt.Println("DoConnection is Called...")
+
+	//设置两个连接属性，在连接创建之后
+	fmt.Println("Set conn Name, Home done!")
+	conn.SetProperty("Name", "Charming")
+	conn.SetProperty("Home", "https://charmingz.com")
+
 	err := conn.SendMsg(2, []byte("DoConnection BEGIN..."))
 	if err != nil {
 		fmt.Println(err)
@@ -48,6 +54,15 @@ func DoConnectionBegin(conn siface.Connection) {
 }
 
 func DoConnectionLost(conn siface.Connection) {
+	//在连接销毁之前，查询conn的Name，Home属性
+	if name, err := conn.GetProperty("Name"); err == nil {
+		fmt.Println("Conn Property Name=", name)
+	}
+
+	if home, err := conn.GetProperty("Home"); err == nil {
+		fmt.Println("Conn Property Home =", home)
+	}
+
 	fmt.Println("DoConnectionLost is Called...")
 }
 

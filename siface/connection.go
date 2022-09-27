@@ -11,6 +11,10 @@ type Connection interface {
 	RemoteAddr() net.Addr           //获取远程客户端地址信息
 	SendMsg(msgId uint32, data []byte) error
 	SendBuffMsg(msgId uint32, data []byte) error //添加带缓冲发送消息接口
+
+	SetProperty(key string, value interface{})
+	GetProperty(key string) (interface{}, error)
+	RemoveProperty(key string)
 }
 
 // 定义一个统一处理连接业务的接口

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/CharmingZhou/myserv/utils"
 
@@ -29,6 +30,9 @@ type Connection struct {
 	msgChan chan []byte
 	//有缓冲管道，用于读、写两个goroutine之间的消息通信
 	msgBuffChan chan []byte //定义channel成员
+
+	property     map[string]interface{}
+	propertyLock sync.RWMutex
 }
 
 // 创建连接的方法
@@ -42,6 +46,7 @@ func NewConnection(server siface.Server, conn *net.TCPConn, connID uint32, msgHa
 		ExitBuffChan: make(chan bool, 1),
 		msgChan:      make(chan []byte), //msgChan初始化
 		msgBuffChan:  make(chan []byte, utils.GlobalObject.MaxMsgChanLen),
+		property:     make(map[string]interface{}),
 	}
 	//将新创建的Conn添加到连接管理中
 	c.TcpServer.GetConnMgr().Add(c) //将当前新创建的连接添加到ConnManager中
@@ -216,4 +221,29 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 	c.msgChan <- msg //将之前直接回写给conn.Write的方法改为发送给Channel供Writer读写
 
 	return nil
+}
+
+func (c *Connection) SetProperty(key string, value interface{}) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	c.property[key] = value
+}
+
+func (c *Connection) GetProperty(key string) (interface{}, error) {
+	c.propertyLock.RLock()
+	defer c.propertyLock.RUnlock()
+
+	if value, ok := c.property[key]; ok {
+		return value, nil
+	} else {
+		return nil, errors.New("no property found")
+	}
+}
+
+func (c *Connection) RemoveProperty(key string) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	delete(c.property, key)
 }
